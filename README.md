@@ -64,7 +64,7 @@ Any other values will be ignored.
 
 ## Purpose
 
-I was curious if I could automate this process to avoid manually installing dozens of apps a after factory reset or ROM change. I know there are some backup apps that achieve a similar result. But I want the apps to be downloaded from the official stores if they are available there.
+I was curious if I could automate this process to avoid manually installing dozens of apps after a factory reset or ROM change. I know there are some backup apps that achieve a similar result. But I want the apps to be downloaded from the official stores if they are available there.
 
 ## Useful links
 
