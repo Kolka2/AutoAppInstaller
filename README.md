@@ -39,7 +39,7 @@ Install apps from JSON file
 AutoAppInstaller.exe listOfApps.json
 ```
 
-Install apps from JSON file to the specific device defined by its id. It's useful when you have multiple devices connected to your PC because by default the program will use the first one from the `adb devices` list. 
+Install apps from JSON file to the specific device defined by its id. It's useful when you have multiple devices connected to your PC because by default the program will use the first one from the `adb devices` list
 
 ```powershell
 AutoAppInstaller.exe listOfApps.json 5a954c87
