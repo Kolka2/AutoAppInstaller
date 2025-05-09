@@ -21,7 +21,7 @@ If your internet connection is very slow, you can increase timeout time when cre
 ## How to use
 
 1. Follow the [quickstart intro](https://appium.io/docs/en/latest/quickstart/) to install Appium server, driver and client
-2. Create JSON file with an array of objects containing the following information about your apps: `label`, `packageName` and `source`, where `source` is an integer representing an enum value.
+2. Create JSON file with an array of objects containing the following information about your apps: `label`, `packageName` and `source`, where `source` is an integer representing an enum value
 3. Enable USB debugging on your phone and connect it to your PC. Check if it's available using `adb devices` command
 4. Make sure that specified sources e.g. Play Store and RuStore are available and functional on your phone
 5. Start the Appium server
