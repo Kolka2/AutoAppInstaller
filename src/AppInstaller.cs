@@ -93,7 +93,7 @@ public sealed class AppInstaller : IDisposable
                 if (wait.Until(driver => driver.CurrentActivity.Contains("packageinstaller")))
                 {
                     /* We got there! The APK downloaded, and PackageInstaller pops up its window.
-                     * button0: Cancel; button1: Install */
+                     * button2: Cancel; button1: Install */
                     installButton = _driver.FindElement(MobileBy.Id("android:id/button1"));
                     installButton.Click();
                 }
