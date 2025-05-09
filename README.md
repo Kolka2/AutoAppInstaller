@@ -6,8 +6,8 @@ Automatically install apps from Play Store, RuStore, F-Droid and local folder on
 
 The program uses Appium + UiAutomator2 driver and its dotnet-client to automate installation process.
 
-First, it will install all local packages located in the 'local' folder within the working directory of this tool. File naming is important and should follow this format: `appLabel-version-packageName.apk`. Actually the main point is that the filename should be dash-separated string where the last part is the `packageName`, and it must end with `.apk`. Otherwise, the file will be ignored.  
-Second, it will iterate over the given array of AppInfo objects and open the corresponding app page in the specified app store, find the 'Install' button using the `UiSelector` locator and click it.  
+**First**, it will install all local packages located in the 'local' folder within the working directory of this tool. File naming is important and should follow this format: `appLabel-version-packageName.apk`. Actually the main point is that the filename should be dash-separated string where the last part is the `packageName`, and it must end with `.apk`. Otherwise, the file will be ignored.  
+**Second**, it will iterate over the given array of AppInfo objects and open the corresponding app page in the specified app store, find the 'Install' button using the `UiSelector` locator and click it.  
 In case of the Google Play Store, that's all. The specified app will be downloaded and installed by the Play Store automatically. There's nothing to do anymore. However, in the case of the non-system app stores such as RuStore and Droid-ify (F-Droid), the Google Package Installer will prompt you each time to confirm the installation with a pop up window. This is the case for unrooted devices. Therefore, we need to wait for the download to finish first and then find the "Install" button again and click it. Listed stores anyway cannot download several apps simultaneously so you can leave your phone and have a cup of tea while installing apps. Required time depends on your app list, internet connection speed and smartphone performance obviously.
 
 If your internet connection is very slow, you can increase timeout time when creating `AppInstaller` instance in the source code to make sure apps will be installed and not ignored because of timeout. Just pass the third parameter of the TimeSpan type to constructor. By default, the timeout is 1 minute. This means that if an download from, e.g., RuStore has not finished within 60 seconds, it will be ognored and not installed automatically. Also it will break the process completely or partially.
@@ -59,7 +59,7 @@ AutoAppInstaller.exe listOfApps.json 5a954c87
 ]
 ```
 
-`source` field represents an enum object where `0 = Google Play, 1 = RuStore, 2 = Droid-ify (F-Droid), 3 = Local`.
+`source` field represents an enum value where `0 = Google Play, 1 = RuStore, 2 = Droid-ify (F-Droid), 3 = Local`.
 Any other values will be ignored.
 
 ## Useful links
