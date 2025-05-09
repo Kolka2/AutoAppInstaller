@@ -62,6 +62,10 @@ AutoAppInstaller.exe listOfApps.json 5a954c87
 `source` field represents an enum value where `0 = Google Play, 1 = RuStore, 2 = Droid-ify (F-Droid), 3 = Local`.
 Any other values will be ignored.
 
+## Purpose
+
+I was curious if I could automate this process to avoid manually installing dozens of apps a after factory reset or ROM change. I know there are some backup apps that achieve a similar result. But I want the apps to be downloaded from the official stores if they are available there.
+
 ## Useful links
 
 - [Appium 2 Beginner Tutorials by Raghav Pal](https://www.youtube.com/playlist?list=PLhW3qG5bs-L8BQaqLpjt5792e8om6IR3k)
