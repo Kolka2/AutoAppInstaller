@@ -2,6 +2,12 @@
 
 Automatically install apps from Play Store, RuStore, F-Droid and local folder on your Android smartphone using Appium
 
+## Known issues
+
+- Google Play Protection may flag your choice and show the "unsafe app blocked" window, warning you that the application you are currently installing was created for an older Android version. This case is not handled by AppInstaller and it will break the process.
+- Installations via RuStore are unreliable and frequently encounter issues.
+- Local apps are being reinstalled. It's a bug.
+
 ## How it works
 
 The program uses Appium + UiAutomator2 driver and its dotnet-client to automate installation process.
@@ -65,6 +71,11 @@ Any other values will be ignored.
 ## Purpose
 
 I was curious if I could automate this process to avoid manually installing dozens of apps after a factory reset or ROM change. I know there are some backup apps that achieve a similar result. But I want the apps to be downloaded from the official stores if they are available there.
+
+## TODO
+
+- [] Add check whether an app is already installed before opening its page in the store.
+- [] Replace counters with the post-install test.
 
 ## Useful links
 
