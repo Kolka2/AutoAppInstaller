@@ -74,8 +74,8 @@ I was curious if I could automate this process to avoid manually installing doze
 
 ## TODO
 
-- [] Add check whether an app is already installed before opening its page in the store.
-- [] Replace counters with the post-install test.
+- [ ] Add check whether an app is already installed before opening its page in the store.
+- [ ] Replace counters with the post-install test.
 
 ## Useful links
 
