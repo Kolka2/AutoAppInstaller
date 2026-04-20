@@ -23,16 +23,21 @@ public sealed class AppInstaller : IDisposable
         _googlePlay = new(
             PackageName: "com.android.vending",
             MainActivity: ".AssetBrowserActivity",
-            Locator: "new UiSelector().className(\"android.widget.Button\").instance(0)"
+            Locator: "new UiSelector().className(\"android.widget.Button\").instance(1)"
         );
         _ruStore = new(
             PackageName: "ru.vk.store",
             MainActivity: ".app.MainActivity",
-            Locator: "new UiSelector().className(\"android.widget.Button\").instance(0)"
+            // For old version of RuStore (v1.82)
+            // Locator: "new UiSelector().className(\"android.widget.Button\").instance(0)"
+            Locator: "new UiSelector().className(\"android.widget.Button\").instance(6)"
         );
         _droidify = new(
+            // PackageName: "org.fdroid.fdroid",
             PackageName: "com.looker.droidify",
+            // MainActivity: "org.fdroid.fdroid.views.main.MainActivity",
             MainActivity: ".MainActivity",
+            // Locator: "new UiSelector().resourceId(\"org.fdroid.fdroid:id/primaryButtonView\")"
             Locator: "new UiSelector().resourceId(\"com.looker.droidify:id/action\")"
         );
     }
@@ -66,15 +71,24 @@ public sealed class AppInstaller : IDisposable
     {
         try
         {
-            _driver.StartActivityWithIntent(
-                appPackage: source.PackageName,
-                appActivity: source.MainActivity,
-                intentAction: "android.intent.action.VIEW",
-                intentOptionalArgs: $"-d \"market://details?id={app.PackageName}\"",
-                stopApp: false
-                );
+            var args = new Dictionary<string, object>
+            {
+                ["package"] = $"{source.PackageName}",
+                ["action"] = "android.intent.action.VIEW",
+                ["uri"] = $"market://details?id={app.PackageName}",
+                ["stop"] = false,
+                ["user"] = 12,  // Work Profile
+                ["wait"] = true
+            };
+            _driver.ExecuteScript("mobile:startActivity", args);
 
-            var installButton = _driver.FindElement(MobileBy.AndroidUIAutomator(source.Locator));
+            // NOTE: Temporary solution?
+            /* Google Play opens an app card (not a full screen). On cold start
+             * the card may not finish drawing and the installation is skipped. */
+            var wait = new WebDriverWait(_driver, TimeSpan.FromSeconds(20));
+
+            var installButton = wait.Until(d => _driver.FindElement(MobileBy.AndroidUIAutomator(source.Locator)));
+
             installButton.Click();
             /* When installing an app from a non-system app, such as RuStore, F-Droid etc.,
              * the google package installer will prompt you each time to confirm the installation
@@ -84,17 +98,21 @@ public sealed class AppInstaller : IDisposable
              * button and click it. */
             if (interactivePackageInstaller)
             {
-                var wait = new DefaultWait<AndroidDriver>(_driver)
+                var lWait = new DefaultWait<AndroidDriver>(_driver)
                 {
                     Timeout = _waiterTimeout,
                     PollingInterval = TimeSpan.FromSeconds(1),
                     Message = $"The '{app.Label}' app from source '{app.Source}' was not installed. Reason: timed out."
                 };
-                if (wait.Until(driver => driver.CurrentActivity.Contains("packageinstaller")))
+                if (lWait.Until(driver => driver.CurrentActivity.Contains("packageinstaller")))
                 {
                     /* We got there! The APK downloaded, and PackageInstaller pops up its window.
                      * button2: Cancel; button1: Install */
                     installButton = _driver.FindElement(MobileBy.Id("android:id/button1"));
+
+                    /* Android 7.1.1 device:
+                     * ["ok_button", "cancel_button"] */
+                    // installButton = _driver.FindElement(MobileBy.Id("com.android.packageinstaller:id/ok_button"));
                     installButton.Click();
                 }
                 else

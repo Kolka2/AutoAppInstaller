@@ -2,6 +2,14 @@
 
 Automatically install apps from Play Store, RuStore, F-Droid and local folder on your Android smartphone using Appium
 
+## Prerequisites
+
+- .NET SDK 10.0+
+- JDK
+- Android SDK
+- Node.js
+- Appium Server
+
 ## Known issues
 
 - Google Play Protection may flag your choice and show the "unsafe app blocked" window, warning you that the application you are currently installing was created for an older Android version. This case is not handled by AppInstaller and it will break the process.
