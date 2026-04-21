@@ -1,13 +1,31 @@
 ﻿using OpenQA.Selenium.Appium.Android;
 using OpenQA.Selenium.Appium;
 using OpenQA.Selenium.Support.UI;
+using System.Text.RegularExpressions;
 
 namespace AutoAppInstaller;
 public record AppInfo(string Label, string PackageName, AppSourceOptions Source);
 public record SourceInfo(string PackageName, string MainActivity, string Locator);
-public enum AppSourceOptions { GooglePlay, RuStore, Droidify, Local }
+[Flags]
+public enum AppSourceOptions 
+{ 
+    Local = 0,
+    GooglePlay = 1,
+    FDroid = 2,
+    RuStore = 3,
+    WorkProfile = 4
+}
+public static class AppSourceExtensions
+{
+    public static bool IsWorkProfile(this AppSourceOptions source) 
+        => source.HasFlag(AppSourceOptions.WorkProfile);
+
+    public static AppSourceOptions GetSourceType(this AppSourceOptions source) 
+        => source & ~AppSourceOptions.WorkProfile;
+}
 public sealed class AppInstaller : IDisposable
 {
+    private Dictionary<string, string>? _localApkCache;
     private readonly AndroidDriver _driver;
     private readonly SourceInfo _googlePlay;
     private readonly SourceInfo _ruStore;
@@ -44,22 +62,44 @@ public sealed class AppInstaller : IDisposable
 
     public (int[] installed, int[] total) InstallApps(IEnumerable<AppInfo> apps)
     {
-        int[] installed = new int[4], total = new int[4];
+        int[] installed = new int[8]; 
+        int[] total = new int[8];
 
-        InstallLocal();
+        int? workProfileId = GetWorkProfileId();
+        FillLocalApkCache();
+
         foreach (var app in apps)
         {
-            bool isSuccess = app.Source switch
+            bool isWorkProfile = app.Source.IsWorkProfile();
+            if (workProfileId is null)
             {
-                AppSourceOptions.GooglePlay => InstallFromStore(_googlePlay, app, false),
-                AppSourceOptions.RuStore => InstallFromStore(_ruStore, app),
-                AppSourceOptions.Droidify => InstallFromStore(_droidify, app),
-                AppSourceOptions.Local => _driver.IsAppInstalled(app.PackageName),
-                _ => throw new NotSupportedException($"Unknown source: {app.Source}")
+                Logger.Log($"[WARNING] Skip {app.PackageName}: Work profile not found.");
+                continue;
+            }
+            int userId = isWorkProfile ? workProfileId.Value : 0;
+
+            if (IsAppInstalledForUser(app.PackageName, userId))
+            {
+                Logger.Log($"[INFO] Skip {app.PackageName}: The app already installed for user with id {userId}");
+                continue;
+            }
+            
+            AppSourceOptions sourceType = app.Source.GetSourceType();
+
+            bool isSuccess = sourceType switch
+            {
+                AppSourceOptions.Local      => InstallLocal(app, userId),
+                AppSourceOptions.GooglePlay => InstallFromStore(_googlePlay, app, userId, false),
+                AppSourceOptions.FDroid     => InstallFromStore(_droidify, app, userId),
+                AppSourceOptions.RuStore    => InstallFromStore(_ruStore, app, userId),
+                _ => throw new NotSupportedException($"Unknown source: {sourceType}")
             };
 
-            int index = (int)app.Source;
-            if (isSuccess) installed[index]++;
+            int index = (int)app.Source; 
+            
+            if (isSuccess)
+                installed[index]++;
+            
             total[index]++;
         }
 
@@ -67,7 +107,7 @@ public sealed class AppInstaller : IDisposable
     }
 
     /* Tested on Sony Xperia 5 III with Android 13 */
-    private bool InstallFromStore(SourceInfo source, AppInfo app, bool interactivePackageInstaller = true)
+    private bool InstallFromStore(SourceInfo source, AppInfo app, int userId, bool interactivePackageInstaller = true)
     {
         try
         {
@@ -77,7 +117,7 @@ public sealed class AppInstaller : IDisposable
                 ["action"] = "android.intent.action.VIEW",
                 ["uri"] = $"market://details?id={app.PackageName}",
                 ["stop"] = false,
-                ["user"] = 12,  // Work Profile
+                ["user"] = userId,
                 ["wait"] = true
             };
             _driver.ExecuteScript("mobile:startActivity", args);
@@ -126,40 +166,131 @@ public sealed class AppInstaller : IDisposable
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Ooops... Something went wrong for app '{app.Label}'. Read the exception message below for details.");
-            Console.WriteLine(ex.Message);
+            Logger.Log($"[ERROR] Ooops... Something went wrong for app '{app.Label}'. Read the exception message below for details.");
+            Logger.Log(ex.Message);
             return false;
         }
     }
 
     /* Filenames must contain packagenames of the corresponding apps in the
      * following format: appLabel-version-packageName.apk
-     * Example: RuStore-v1.68.1.0-ru.vk.store.apk
+     * Example: Droidify-v0.7.1-com.looker.droidify.apk
      * Main point is that packagename is located after the last dash symbol.
      * Also note that this method will not replace any already installed app. */
-    private void InstallLocal()
+    private bool InstallLocal(AppInfo app, int userId)
     {
+        if (_localApkCache == null || !_localApkCache.TryGetValue(app.PackageName, out string? apkPath))
+        {
+            Logger.Log($"[INFO] Skip: file for {app.PackageName} not found in 'local' folder.");
+            return false;
+        }
+
+        if (IsAppInstalledForUser(app.PackageName, userId)) 
+            return true;
+
+        string fileName = Path.GetFileName(apkPath);
+        string deviceTempPath = $"/data/local/tmp/{fileName}";
+
+        try
+        {
+            Logger.Log($"[DEBUG] Pushing {fileName} to {deviceTempPath}...");
+            _driver.PushFile(deviceTempPath, new FileInfo(apkPath));
+
+            var args = new Dictionary<string, object>
+            {
+                ["command"] = "pm",
+                ["args"] = new List<string> { "install", "--user", userId.ToString(), deviceTempPath }
+            };
+            
+            _driver.ExecuteScript("mobile: shell", args);
+            Logger.Log($"[INFO] Successfully installed local package {app.PackageName} for user {userId}");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Logger.Log($"[ERROR] Couldn't install local package {app.PackageName} for user {userId}: {ex.Message}");
+            return false;
+        }
+        finally
+        {
+            try 
+            {
+                _driver.ExecuteScript("mobile: shell", new Dictionary<string, object> 
+                { 
+                    ["command"] = "rm", 
+                    ["args"] = new List<string> { "-f", deviceTempPath }
+                });
+            }
+            catch { }
+        }
+    }
+    private void FillLocalApkCache()
+    {
+        if (_localApkCache != null) 
+            return;
+
+        _localApkCache = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         string path = Path.Combine(Environment.CurrentDirectory, "local");
+
         if (!Directory.Exists(path))
         {
-            Console.WriteLine("The 'local' folder is not present in the current working directory. No local packages will be installed.");
+            Logger.Log("[WARNING] The 'local' folder is not present in the current working directory. No local packages will be installed.");
             return;
         }
 
         var directoryInfo = new DirectoryInfo(path);
         foreach (var apk in directoryInfo.EnumerateFiles("*.apk"))
         {
-            int packageNameStartPosition = apk.Name.LastIndexOf('-');
-            if (packageNameStartPosition < 0)
+            int dashIndex = apk.Name.LastIndexOf('-');
+            if (dashIndex < 0)
             {
-                Console.WriteLine("Wrong file naming for the file {0}. Skipping...", apk.Name);
+                Logger.Log($"[WARNING] Wrong file naming for the file {apk.Name}. Skipping...");
                 continue;
             }
-            string packageName = apk.Name.Substring(packageNameStartPosition + 1);
-            if (_driver.IsAppInstalled(packageName))
-                continue;
-            _driver.InstallApp(apk.FullName);
+
+            string packageName = apk.Name.Substring(dashIndex + 1).Replace(".apk", "");
+            
+            if (!_localApkCache.ContainsKey(packageName))
+            {
+                _localApkCache.Add(packageName, apk.FullName);
+            }
         }
+    }
+    public int? GetWorkProfileId()
+    {
+        var args = new Dictionary<string, object>
+        {
+            ["command"] = "pm",
+            ["args"] = new List<string> { "list", "users" }
+        };
+
+        var output = _driver.ExecuteScript("mobile: shell", args)?.ToString();
+        
+        var match = Regex.Match(output ?? "", @"UserInfo\{(\d+):Work\b");
+
+        if (match.Success)
+            return int.Parse(match.Groups[1].Value);
+
+        return null;
+    }
+
+    public bool IsAppInstalledForUser(string packageName, int userId)
+    {
+        var args = new Dictionary<string, object>
+        {
+            ["command"] = "dumpsys",
+            ["args"] = new List<string>() { "package", packageName }
+        };
+
+        var output = _driver.ExecuteScript("mobile: shell", args)?.ToString();
+
+        if (string.IsNullOrEmpty(output)) 
+            return false;
+
+        string pattern = $@"^\s+User\s+{userId}:.*installed=true";
+        var match = Regex.Match(output, pattern, RegexOptions.Multiline);
+
+        return match.Success;
     }
     public void Dispose() => _driver?.Quit();
 }

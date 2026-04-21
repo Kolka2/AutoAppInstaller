@@ -5,7 +5,7 @@ Automatically install apps from Play Store, RuStore, F-Droid and local folder on
 ## Prerequisites
 
 - .NET SDK 10.0+
-- JDK
+- JDK 8+
 - Android SDK
 - Node.js
 - Appium Server
@@ -82,7 +82,7 @@ I was curious if I could automate this process to avoid manually installing doze
 
 ## TODO
 
-- [ ] Add check whether an app is already installed before opening its page in the store.
+- [x] Add check whether an app is already installed before opening its page in the store.
 - [ ] Replace counters with the post-install test.
 
 ## Useful links

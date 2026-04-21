@@ -23,7 +23,7 @@ internal class Program
     {
         if (args.Length == 0)
         {
-            Console.WriteLine(_usageInfo);
+            Logger.Log(_usageInfo);
             return 0;
         }
 
@@ -34,7 +34,7 @@ internal class Program
 
             if (apps.Length == 0)
             {
-                Console.WriteLine($"Provided JSON file '{args[0]}' contains an empty array. Nothing to do. Exiting...");
+                Logger.Log($"Provided JSON file '{args[0]}' contains an empty array. Nothing to do. Exiting...");
                 return 0;
             }
 
@@ -51,18 +51,28 @@ internal class Program
             using var installer = new AppInstaller(serverUri, driverOptions);
             var (installed, total) = installer.InstallApps(apps);
 
-            Console.WriteLine($"""
-            Summary. 
-            Installed
-            Google Play apps: {installed[0]}/{total[0]}
-            RuStore apps: {installed[1]}/{total[1]}
+            Logger.Log($"""
+            [INFO] Finished.
+            ---
+            Summary.
+
+            Installed (user 0)
+            Local apps: {installed[0]}/{total[0]}
+            Google Play apps: {installed[1]}/{total[1]}
             F-Droid apps: {installed[2]}/{total[2]}
-            Local apps: {installed[3]}/{total[3]}
+            RuStore apps: {installed[3]}/{total[3]}
+
+            Installed (Work profile)
+            Local apps: {installed[4]}/{total[4]}
+            Google Play apps: {installed[5]}/{total[5]}
+            F-Droid apps: {installed[6]}/{total[6]}
+            RuStore apps: {installed[7]}/{total[7]}
+            ---
             """);
         }
         catch (Exception ex)
         {
-            Console.WriteLine(ex.Message);
+            Logger.Log(ex.Message);
             return 1;
         }
 
