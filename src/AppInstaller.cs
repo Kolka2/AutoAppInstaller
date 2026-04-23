@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 
 namespace AutoAppInstaller;
 public record AppInfo(string Label, string PackageName, AppSourceOptions Source);
+// TODO: Remove MainActivity field
 public record SourceInfo(string PackageName, string MainActivity, string Locator);
 [Flags]
 public enum AppSourceOptions 
@@ -12,7 +13,7 @@ public enum AppSourceOptions
     Local = 0,
     GooglePlay = 1,
     FDroid = 2,
-    RuStore = 3,
+    AppGallery = 3,
     WorkProfile = 4
 }
 public static class AppSourceExtensions
@@ -27,10 +28,10 @@ public sealed class AppInstaller : IDisposable
 {
     private Dictionary<string, string>? _localApkCache;
     private readonly AndroidDriver _driver;
-    private readonly SourceInfo _googlePlay;
-    private readonly SourceInfo _ruStore;
-    private readonly SourceInfo _droidify;
     private readonly TimeSpan _waiterTimeout;
+    private readonly SourceInfo _googlePlay;
+    private readonly SourceInfo _appGallery;
+    private readonly SourceInfo _droidify;
 
     public AppInstaller(Uri serverUri, AppiumOptions driverOptions, TimeSpan? waiterTimeout = null)
     {
@@ -41,14 +42,13 @@ public sealed class AppInstaller : IDisposable
         _googlePlay = new(
             PackageName: "com.android.vending",
             MainActivity: ".AssetBrowserActivity",
-            Locator: "new UiSelector().className(\"android.widget.Button\").instance(1)"
+            Locator: "new UiSelector().textMatches(\"(?i)Install|Установить\")"
         );
-        _ruStore = new(
-            PackageName: "ru.vk.store",
-            MainActivity: ".app.MainActivity",
-            // For old version of RuStore (v1.82)
-            // Locator: "new UiSelector().className(\"android.widget.Button\").instance(0)"
-            Locator: "new UiSelector().className(\"android.widget.Button\").instance(6)"
+        _appGallery = new(
+            PackageName: "com.huawei.appmarket",
+            MainActivity: ".MainActivity",
+            // Locator: "new UiSelector().resourceId(\"com.huawei.appmarket:id/rl_download\")"
+            Locator: "new UiSelector().resourceId(\"com.huawei.appmarket:id/btn_download\")"
         );
         _droidify = new(
             // PackageName: "org.fdroid.fdroid",
@@ -59,24 +59,33 @@ public sealed class AppInstaller : IDisposable
             Locator: "new UiSelector().resourceId(\"com.looker.droidify:id/action\")"
         );
     }
-
+    /* Assumes that app stores alreay installed and configured e. g.
+     * they have necessary permissions */
     public (int[] installed, int[] total) InstallApps(IEnumerable<AppInfo> apps)
     {
-        int[] installed = new int[8]; 
+        int[] installed = new int[8];
         int[] total = new int[8];
+        int? workProfileId = null;
 
-        int? workProfileId = GetWorkProfileId();
+        var isWorkProfileRequired = apps.Select(a => a.Source)
+                                        .FirstOrDefault(a => a.IsWorkProfile());
+
+        if (isWorkProfileRequired.IsWorkProfile())
+        {
+            workProfileId = GetWorkProfileId();
+            if (!workProfileId.HasValue)
+            {
+                Logger.Log("[ERROR] Work profile not found but it was requested by user. Terminating...");
+                return ([0], [0]);
+            }
+        }
+
         FillLocalApkCache();
 
         foreach (var app in apps)
         {
             bool isWorkProfile = app.Source.IsWorkProfile();
-            if (workProfileId is null)
-            {
-                Logger.Log($"[WARNING] Skip {app.PackageName}: Work profile not found.");
-                continue;
-            }
-            int userId = isWorkProfile ? workProfileId.Value : 0;
+            int userId = isWorkProfile ? workProfileId!.Value : 0;
 
             if (IsAppInstalledForUser(app.PackageName, userId))
             {
@@ -91,7 +100,7 @@ public sealed class AppInstaller : IDisposable
                 AppSourceOptions.Local      => InstallLocal(app, userId),
                 AppSourceOptions.GooglePlay => InstallFromStore(_googlePlay, app, userId, false),
                 AppSourceOptions.FDroid     => InstallFromStore(_droidify, app, userId),
-                AppSourceOptions.RuStore    => InstallFromStore(_ruStore, app, userId),
+                AppSourceOptions.AppGallery => InstallFromStore(_appGallery, app, userId),
                 _ => throw new NotSupportedException($"Unknown source: {sourceType}")
             };
 
@@ -107,7 +116,7 @@ public sealed class AppInstaller : IDisposable
     }
 
     /* Tested on Sony Xperia 5 III with Android 13 */
-    private bool InstallFromStore(SourceInfo source, AppInfo app, int userId, bool interactivePackageInstaller = true)
+    private bool InstallFromStore(SourceInfo source, AppInfo app, int userId, bool interactive = true)
     {
         try
         {
@@ -116,7 +125,7 @@ public sealed class AppInstaller : IDisposable
                 ["package"] = $"{source.PackageName}",
                 ["action"] = "android.intent.action.VIEW",
                 ["uri"] = $"market://details?id={app.PackageName}",
-                ["stop"] = false,
+                ["stop"] = interactive,
                 ["user"] = userId,
                 ["wait"] = true
             };
@@ -130,13 +139,13 @@ public sealed class AppInstaller : IDisposable
             var installButton = wait.Until(d => _driver.FindElement(MobileBy.AndroidUIAutomator(source.Locator)));
 
             installButton.Click();
-            /* When installing an app from a non-system app, such as RuStore, F-Droid etc.,
+            /* When installing an app from a non-system app, such as AppGallery, F-Droid etc.,
              * the google package installer will prompt you each time to confirm the installation
              * with a pop up window. Unless you install an app from the Play Store or have a rooted
              * device, you cannot escape this window if you want to install an app from your smartphone.
              * Therefore, we need to wait for the download to finish and then find the "Install"
              * button and click it. */
-            if (interactivePackageInstaller)
+            if (interactive)
             {
                 var lWait = new DefaultWait<AndroidDriver>(_driver)
                 {
@@ -144,6 +153,7 @@ public sealed class AppInstaller : IDisposable
                     PollingInterval = TimeSpan.FromSeconds(1),
                     Message = $"The '{app.Label}' app from source '{app.Source}' was not installed. Reason: timed out."
                 };
+                
                 if (lWait.Until(driver => driver.CurrentActivity.Contains("packageinstaller")))
                 {
                     /* We got there! The APK downloaded, and PackageInstaller pops up its window.

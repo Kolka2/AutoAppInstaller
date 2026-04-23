@@ -60,13 +60,13 @@ internal class Program
             Local apps: {installed[0]}/{total[0]}
             Google Play apps: {installed[1]}/{total[1]}
             F-Droid apps: {installed[2]}/{total[2]}
-            RuStore apps: {installed[3]}/{total[3]}
+            AppGallery apps: {installed[3]}/{total[3]}
 
             Installed (Work profile)
             Local apps: {installed[4]}/{total[4]}
             Google Play apps: {installed[5]}/{total[5]}
             F-Droid apps: {installed[6]}/{total[6]}
-            RuStore apps: {installed[7]}/{total[7]}
+            AppGallery apps: {installed[7]}/{total[7]}
             ---
             """);
         }
