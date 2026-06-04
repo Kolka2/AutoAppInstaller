@@ -9,6 +9,7 @@ Automatically install apps from Play Store, RuStore, F-Droid and local folder on
 - Android SDK
 - Node.js
 - Appium Server
+- UiAutomator2 driver 4.2.9+
 
 ## Known issues
 

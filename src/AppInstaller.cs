@@ -276,7 +276,7 @@ public sealed class AppInstaller : IDisposable
 
         var output = _driver.ExecuteScript("mobile: shell", args)?.ToString();
         
-        var match = Regex.Match(output ?? "", @"UserInfo\{(\d+):Work\b");
+        var match = Regex.Match(output ?? "", @"UserInfo\{(\d+):(Work|Рабочий)\b");
 
         if (match.Success)
             return int.Parse(match.Groups[1].Value);
